@@ -85,3 +85,44 @@ ax2.spines[['top', 'right']].set_visible(False)
 fig2.tight_layout()
 fig2.savefig('cdf.png', dpi=150)
 
+# M/S analysis  at many sample sizes
+def run_mc(n, seed):
+    """One Monte Carlo run of n LHS scenarios -> n flow rates."""
+    u = qmc.LatinHypercube(d=m, seed=seed).random(n=n)
+    Xn = np.stack([r_w.ppf(u[:, 0]), r.ppf(u[:, 1]),
+                   t_u.ppf(u[:, 2]), h_u.ppf(u[:, 3]),
+                   t_l.ppf(u[:, 4]), h_l.ppf(u[:, 5]),
+                   l.ppf(u[:, 6]), k_w.ppf(u[:, 7])], axis=1)
+    return func(Xn)
+
+Ns = 2 ** np.arange(4, 16)          # 16, 32, ... 32768
+M_conv = np.zeros(len(Ns))          # mean at each sample size
+S_conv = np.zeros(len(Ns))          # std dev at each sample size
+
+for i, n in enumerate(Ns):
+    y = run_mc(n, seed=seed)        
+    M_conv[i] = y.mean()
+    S_conv[i] = y.std(ddof=1)
+
+fig3, axs = plt.subplots(1, 2, figsize=(14, 4))
+axs[0].plot(Ns, M_conv, 'o-', color='#4C72B0')
+axs[0].axhline(M_conv[-1], color='grey', ls='--', lw=1,
+               label=f'largest N: {M_conv[-1]:.2f}')
+axs[0].set_ylabel('Mean of $y$  [m$^3$/yr]')
+axs[0].set_title('Mean vs sample size')
+
+axs[1].plot(Ns, S_conv, 'o-', color='#55A868')
+axs[1].axhline(S_conv[-1], color='grey', ls='--', lw=1,
+               label=f'largest N: {S_conv[-1]:.2f}')
+axs[1].set_ylabel('Std. dev. of $y$  [m$^3$/yr]')
+axs[1].set_title('Standard deviation vs sample size')
+
+for a in axs:
+    a.set_xscale('log', base=2)
+    a.set_xlabel('N  (sample size)')
+    a.grid(alpha=0.3, which='both')
+    a.legend(frameon=False, fontsize=9)
+    a.spines[['top', 'right']].set_visible(False)
+
+fig3.tight_layout()
+fig3.savefig('convergence.png', dpi=150)
