@@ -17,7 +17,7 @@ h_l = uniform(loc=700, scale=820-700)
 l = uniform(loc=1120, scale=1680-1120)
 k_w = norm(loc=10000, scale=1500)
 
-# Monte Carlo Sampling
+# Monte Carlo sampling
 N = 2**10  # Monte Carlo samples
 seed = 1234
 sampler = qmc.LatinHypercube(d=m, seed=seed)
@@ -39,6 +39,8 @@ Y = func(X)
 print("Mean of f(x):",Y.mean())
 print("Standard deviation of f(x)",Y.std(ddof=1))
 print("Variance of f(x)",Y.var(ddof=1))    
+MCerr = Y.std(ddof=1)/np.sqrt(N)
+print("Monte Carlo Error:", MCerr)
 
 # Histogram of Y density
 fig, ax = plt.subplots(figsize=(7.5, 4.2))
@@ -82,3 +84,4 @@ ax2.grid(alpha=0.3)
 ax2.spines[['top', 'right']].set_visible(False)
 fig2.tight_layout()
 fig2.savefig('cdf.png', dpi=150)
+
