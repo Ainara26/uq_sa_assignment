@@ -98,22 +98,23 @@ def run_mc(n, seed):
 Ns = 2 ** np.arange(4, 16)          # 16, 32, ... 32768
 M_conv = np.zeros(len(Ns))          # mean at each sample size
 S_conv = np.zeros(len(Ns))          # std dev at each sample size
+E_conv = np.zeros(len(Ns))          # Monte Carlo error at each sample size
 
 for i, n in enumerate(Ns):
-    y = run_mc(n, seed=seed)        
+    y = run_mc(n, seed=seed)
     M_conv[i] = y.mean()
     S_conv[i] = y.std(ddof=1)
+    E_conv[i] = S_conv[i] / np.sqrt(n)
 
 fig3, axs = plt.subplots(1, 2, figsize=(14, 4))
-axs[0].plot(Ns, M_conv, 'o-', color='#4C72B0')
-axs[0].axhline(M_conv[-1], color='grey', ls='--', lw=1,
-               label=f'largest N: {M_conv[-1]:.2f}')
+axs[0].errorbar(Ns, M_conv, yerr=E_conv, fmt='o-', color='#4C72B0',
+                capsize=3, lw=1.5, label=r'M $\pm$ MCerr')
 axs[0].set_ylabel('Mean of $y$  [m$^3$/yr]')
 axs[0].set_title('Mean vs sample size')
 
 axs[1].plot(Ns, S_conv, 'o-', color='#55A868')
 axs[1].axhline(S_conv[-1], color='grey', ls='--', lw=1,
-               label=f'largest N: {S_conv[-1]:.2f}')
+               label=f'value at N = {Ns[-1]}: {S_conv[-1]:.2f}')
 axs[1].set_ylabel('Std. dev. of $y$  [m$^3$/yr]')
 axs[1].set_title('Standard deviation vs sample size')
 
