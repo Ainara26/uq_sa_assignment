@@ -42,18 +42,43 @@ print("Variance of f(x)",Y.var(ddof=1))
 
 # Histogram of Y density
 fig, ax = plt.subplots(figsize=(7.5, 4.2))
-ax.hist(Y, bins='auto', density=True,
-        color='#4C72B0', edgecolor='white', linewidth=0.5)
+ax.hist(Y, bins='auto', color='#4C72B0', edgecolor='white', linewidth=0.5)
 std = Y.std(ddof=1)
 ax.axvspan(Y.mean() - std, Y.mean() + std, color='grey', alpha=0.15, zorder=0,
            label=rf'mean $\pm$ 1$\sigma$: {Y.mean()-std:.1f} - {Y.mean()+std:.1f}')
 ax.axvline(Y.mean(), color='#C44E52', lw=2,
            label=f'mean = {Y.mean():.1f}')
 ax.set_xlabel('Flow rate  [m$^3$/yr]')
-ax.set_ylabel('Density')
+ax.set_ylabel('Frequency')
 ax.set_title(f'Borehole output distribution - LHS Monte Carlo, N = {N}')
 ax.legend(frameon=False)
 ax.grid(axis='y', alpha=0.3)
 ax.spines[['top', 'right']].set_visible(False)
 fig.tight_layout()
 fig.savefig('histogram.png', dpi=150)
+
+# CDF of Y: sort the samples, i-th smallest sits at height i/N
+ys = np.sort(Y)
+p = np.arange(1, N + 1) / N
+
+fig2, ax2 = plt.subplots(figsize=(7.5, 4.2))
+ax2.step(ys, p, where='post', color='#4C72B0', lw=1.8)
+
+# how to read a percentile off the curve
+for q, c in [(0.05, '#937860'), (0.50, '#DD8452'), (0.95, '#937860')]:
+    yq = np.percentile(Y, 100 * q)
+    ax2.hlines(q, ys[0], yq, color=c, ls='--', lw=1)
+    ax2.vlines(yq, 0, q, color=c, ls='--', lw=1)
+    ax2.annotate(f'P{int(q * 100)} = {yq:.1f}', xy=(yq, q),
+                 xytext=(7, 5 if q < 0.1 else -13), textcoords='offset points',
+                 fontsize=9, color=c)
+
+ax2.set_xlim(ys[0], ys[-1])
+ax2.set_ylim(0, 1)
+ax2.set_xlabel('Flow rate  [m$^3$/yr]')
+ax2.set_ylabel('Cumulative probability  $F(y)$')
+ax2.set_title(f'CDF of the borehole output - LHS Monte Carlo, N = {N}')
+ax2.grid(alpha=0.3)
+ax2.spines[['top', 'right']].set_visible(False)
+fig2.tight_layout()
+fig2.savefig('cdf.png', dpi=150)
