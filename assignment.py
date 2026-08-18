@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.stats import lognorm, uniform, norm, qmc
+from scipy.optimize import lsq_linear
 from src.uq_sa_assignment.borehole_func import func
 
 # Define parameter distribution
@@ -127,3 +128,36 @@ for a in axs:
 
 fig3.tight_layout()
 fig3.savefig('convergence.png', dpi=150)
+
+# SRC Method Analysis
+# names of the X columns
+names = ['r_w', 'r', 't_u', 'h_u', 't_l', 'h_l', 'l', 'k_w']
+
+# Standardize inputs and output: measure everything in its own std deviations.
+# After this both have mean 0, so the regression needs no intercept, and the
+# fitted coefficients ARE the standardized regression coefficients.
+Xs = (X - X.mean(axis=0)) / X.std(axis=0)
+Ys = (Y - Y.mean()) / Y.std()
+
+# Bounded least squares. An SRC must lie in [-1, 1], so those are the bounds.
+res = lsq_linear(Xs, Ys, bounds=(-np.ones(m), np.ones(m)))
+SRC = res.x
+
+# R^2 = fraction of Var(Y) reproduced by the linear surrogate
+Ys_hat = Xs @ SRC
+R2 = 1 - ((Ys - Ys_hat) ** 2).sum() / ((Ys - Ys.mean()) ** 2).sum()
+print(f"\nSRC analysis:  R2 = {R2:.4f}")
+
+# SRC plot
+order = np.argsort(-np.abs(SRC))
+fig4, ax4 = plt.subplots(figsize=(7.5, 4.2))
+ax4.bar([names[j] for j in order], SRC[order],
+        color=['#4C72B0' if SRC[j] > 0 else '#C44E52' for j in order])
+ax4.axhline(0, color='black', lw=0.8)
+ax4.set_xlabel('Input parameter')
+ax4.set_ylabel('SRC')
+ax4.set_title(f'Standardized regression coefficients   ($R^2$ = {R2:.3f})')
+ax4.grid(axis='y', alpha=0.3)
+ax4.spines[['top', 'right']].set_visible(False)
+fig4.tight_layout()
+fig4.savefig('src.png', dpi=150)
