@@ -17,6 +17,7 @@ h_l = uniform(loc=700, scale=820-700)
 l = uniform(loc=1120, scale=1680-1120)
 k_w = norm(loc=10000, scale=1500)
 
+# Monte Carlo Sampling
 N = 2**10  # Monte Carlo samples
 seed = 1234
 sampler = qmc.LatinHypercube(d=m, seed=seed)
@@ -34,12 +35,25 @@ X_kw = k_w.ppf(sample[:, 7])
 X = np.stack([X_rw, X_r, X_tu, X_hu, X_tl, X_hl, X_l, X_kw], axis=1)
 Y = func(X)
 
+# Statistical parameters
 print("Mean of f(x):",Y.mean())
 print("Standard deviation of f(x)",Y.std(ddof=1))
 print("Variance of f(x)",Y.var(ddof=1))    
 
-plt.hist(Y, bins='auto', density=True)
-plt.axvline(x=Y.mean())
-plt.xlabel('Flow rate (m3/yr)')
-plt.ylabel('Density')
-plt.savefig('histogram.png', dpi=150)
+# Histogram of Y density
+fig, ax = plt.subplots(figsize=(7.5, 4.2))
+ax.hist(Y, bins='auto', density=True,
+        color='#4C72B0', edgecolor='white', linewidth=0.5)
+std = Y.std(ddof=1)
+ax.axvspan(Y.mean() - std, Y.mean() + std, color='grey', alpha=0.15, zorder=0,
+           label=rf'mean $\pm$ 1$\sigma$: {Y.mean()-std:.1f} - {Y.mean()+std:.1f}')
+ax.axvline(Y.mean(), color='#C44E52', lw=2,
+           label=f'mean = {Y.mean():.1f}')
+ax.set_xlabel('Flow rate  [m$^3$/yr]')
+ax.set_ylabel('Density')
+ax.set_title(f'Borehole output distribution - LHS Monte Carlo, N = {N}')
+ax.legend(frameon=False)
+ax.grid(axis='y', alpha=0.3)
+ax.spines[['top', 'right']].set_visible(False)
+fig.tight_layout()
+fig.savefig('histogram.png', dpi=150)
