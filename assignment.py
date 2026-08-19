@@ -21,19 +21,23 @@ k_w = norm(loc=10000, scale=1500)
 # Monte Carlo sampling
 N = 2**10  # Monte Carlo samples
 seed = 1234
-sampler = qmc.LatinHypercube(d=m, seed=seed)
-sample = sampler.random(n=N)
 
-X_rw = r_w.ppf(sample[:, 0])
-X_r = r.ppf(sample[:, 1])
-X_tu = t_u.ppf(sample[:, 2])
-X_hu = h_u.ppf(sample[:, 3])
-X_tl = t_l.ppf(sample[:, 4])
-X_hl = h_l.ppf(sample[:, 5])
-X_l = l.ppf(sample[:, 6])
-X_kw = k_w.ppf(sample[:, 7])
+def sample_X(n, seed):
+    sampler = qmc.LatinHypercube(d=m, seed=seed)
+    sample = sampler.random(n=n)
+    X_rw = r_w.ppf(sample[:, 0])
+    X_r = r.ppf(sample[:, 1])
+    X_tu = t_u.ppf(sample[:, 2])
+    X_hu = h_u.ppf(sample[:, 3])
+    X_tl = t_l.ppf(sample[:, 4])
+    X_hl = h_l.ppf(sample[:, 5])
+    X_l = l.ppf(sample[:, 6])
+    X_kw = k_w.ppf(sample[:, 7])
 
-X = np.stack([X_rw, X_r, X_tu, X_hu, X_tl, X_hl, X_l, X_kw], axis=1)
+    X = np.stack([X_rw, X_r, X_tu, X_hu, X_tl, X_hl, X_l, X_kw], axis=1)
+    return X
+
+X = sample_X(N, seed)
 Y = func(X)
 
 # Statistical parameters
@@ -133,17 +137,13 @@ fig3.savefig('convergence.png', dpi=150)
 # names of the X columns
 names = ['r_w', 'r', 't_u', 'h_u', 't_l', 'h_l', 'l', 'k_w']
 
-# Standardize inputs and output: measure everything in its own std deviations.
-# After this both have mean 0, so the regression needs no intercept, and the
-# fitted coefficients ARE the standardized regression coefficients.
+# standardize inputs and output 
 Xs = (X - X.mean(axis=0)) / X.std(axis=0)
 Ys = (Y - Y.mean()) / Y.std()
 
-# Bounded least squares. An SRC must lie in [-1, 1], so those are the bounds.
-res = lsq_linear(Xs, Ys, bounds=(-np.ones(m), np.ones(m)))
+res = lsq_linear(Xs, Ys, bounds=(-np.ones(m), np.ones(m))) # SRC must lie between -1 and 1
 SRC = res.x
 
-# R^2 = fraction of Var(Y) reproduced by the linear surrogate
 Ys_hat = Xs @ SRC
 R2 = 1 - ((Ys - Ys_hat) ** 2).sum() / ((Ys - Ys.mean()) ** 2).sum()
 print(f"\nSRC analysis:  R2 = {R2:.4f}")
@@ -161,3 +161,60 @@ ax4.grid(axis='y', alpha=0.3)
 ax4.spines[['top', 'right']].set_visible(False)
 fig4.tight_layout()
 fig4.savefig('src.png', dpi=150)
+
+# Sobol Method Analysis
+N_sobol = 2**16
+XA = sample_X(n=N_sobol, seed=seed)      # first independent sample
+XB = sample_X(n=N_sobol, seed=5678)      # second independent sample
+YA = func(XA)
+YB = func(XB)
+
+VA = np.mean(YA**2) - np.mean(YA)**2     # output variance of sample A
+
+Si = np.zeros(m)                         # first-order indices
+STi = np.zeros(m)                        # total-order indices
+
+for i in range(m):
+    XAB = XA.copy()
+    XAB[:, i] = XB[:, i]                 # A, with column i frozen from B
+    XBA = XB.copy()
+    XBA[:, i] = XA[:, i]                 # B, with column i frozen from A
+
+    YAB = func(XAB)
+    YBA = func(XBA)
+
+    Si[i] = (np.mean(YA * YBA) - np.mean(YA) * np.mean(YBA)) / VA
+    STi[i] = np.mean(YA * (YA - YAB)) / VA
+
+# comparison table
+print(f"\nSobol' analysis   N = {N_sobol}, {(2*m + 2) * N_sobol} model evaluations")
+print(f"  {'param':6} {'S_i':>8} {'S_Ti':>8} {'S_Ti-S_i':>9} {'SRC^2':>8} {'S_i-SRC^2':>10}")
+for j in np.argsort(-STi):
+    print(f"  {names[j]:6} {Si[j]:>8.4f} {STi[j]:>8.4f} {STi[j]-Si[j]:>9.4f} "
+          f"{SRC[j]**2:>8.4f} {Si[j]-SRC[j]**2:>10.4f}")
+
+print(f"\n  sum S_i  = {Si.sum():.4f}   <- additive share of the variance")
+print(f"  sum S_Ti = {STi.sum():.4f}   <- must be >= 1")
+print(f"  R2 (linear, from SRC)          = {R2:.4f}")
+print(f"  nonlinear main effects  sum S_i - R2 = {Si.sum() - R2:.4f}")
+
+# comparison figure
+order = np.argsort(-STi)
+xpos = np.arange(m)
+w = 0.27
+
+fig5, ax5 = plt.subplots(figsize=(9, 4.4))
+ax5.bar(xpos - w, Si[order], w, label="Sobol' $S_i$ (first order)", color='#4C72B0')
+ax5.bar(xpos,     STi[order], w, label="Sobol' $S_{Ti}$ (total)",   color='#8FA8D0')
+ax5.bar(xpos + w, SRC[order]**2, w, label='SRC$^2$',                color='#DD8452')
+ax5.set_xticks(xpos)
+ax5.set_xticklabels([names[j] for j in order])
+ax5.set_xlabel('Input parameter')
+ax5.set_ylabel('Share of output variance')
+ax5.set_title("Sensitivity indices: Sobol' vs SRC   "
+              f"($R^2$ = {R2:.3f},  interactions = {1-Si.sum():.3f})")
+ax5.legend(frameon=False)
+ax5.grid(axis='y', alpha=0.3)
+ax5.spines[['top', 'right']].set_visible(False)
+fig5.tight_layout()
+fig5.savefig('sensitivity_comparison.png', dpi=150)
