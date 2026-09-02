@@ -1,6 +1,4 @@
 """Input distributions for the borehole function (Table 1 of the assignment).
-
-Import-safe: defining these runs no analysis and produces no output.
 """
 
 import numpy as np
@@ -28,8 +26,6 @@ h_l = _uniform(700, 820)                 # potentiometric head, lower aquifer [m
 l = _uniform(1120, 1680)                 # length of borehole [m]
 k_w = norm(loc=10000, scale=1500)        # hydraulic conductivity [m/yr]
 
-# Column order -- defined once here, and everything else derives from it.
-# Must match the unpack order inside borehole_func.func().
 NAMES = ['r_w', 'r', 't_u', 'h_u', 't_l', 'h_l', 'l', 'k_w']
 DISTS = [r_w, r, t_u, h_u, t_l, h_l, l, k_w]
 M = len(DISTS)                           # number of input parameters
@@ -47,4 +43,24 @@ def sample_X(n, seed, method='lhs'):
     else:
         raise ValueError(f"unknown method {method!r}, expected 'lhs' or 'mc'")
 
+    return np.stack([d.ppf(u[:, j]) for j, d in enumerate(DISTS)], axis=1)
+
+
+def sample_X_correlated(n, seed, rho):
+    """Like sample_X, but with h_u and h_l positively correlated.
+    """
+    rng = np.random.default_rng(seed)
+
+    # 1. eight columns of bell-curve numbers, not uniform ones: blending
+    z = rng.standard_normal((n, M))
+
+    # 2. rebuild the h_l column as a blend of its partner and itself.
+    i_hu = NAMES.index('h_u')
+    i_hl = NAMES.index('h_l')
+    z[:, i_hl] = rho * z[:, i_hu] + np.sqrt(1 - rho**2) * z[:, i_hl]
+
+    # 3. back to numbers between 0 and 1. norm.cdf preserves order, so the
+    u = norm.cdf(z)
+
+    # 4. same final step as sample_X
     return np.stack([d.ppf(u[:, j]) for j, d in enumerate(DISTS)], axis=1)
