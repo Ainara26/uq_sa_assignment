@@ -46,21 +46,33 @@ def sample_X(n, seed, method='lhs'):
     return np.stack([d.ppf(u[:, j]) for j, d in enumerate(DISTS)], axis=1)
 
 
-def sample_X_correlated(n, seed, rho):
-    """Like sample_X, but with h_u and h_l positively correlated.
+def correlation_matrix(rho, pair=('h_u', 'h_l')):
+    """M x M target correlation matrix: identity, plus rho between `pair`."""
+    C = np.eye(M)
+    i, j = NAMES.index(pair[0]), NAMES.index(pair[1])
+    C[i, j] = C[j, i] = rho
+    return C
+
+
+def iman_conover(X, target_corr, seed=0):
+    """Reorder each column of X so the sample matches `target_corr`.
+
+    Every column keeps exactly the values it already had, so the marginals
+    are preserved exactly. Only which values share a row changes.
     """
-    rng = np.random.default_rng(seed)
+    n, m = X.shape
 
-    # 1. eight columns of bell-curve numbers, not uniform ones: blending
-    z = rng.standard_normal((n, M))
+    # 1. a throwaway template with the correlation we want.
+    L = np.linalg.cholesky(target_corr)
+    Z = np.random.default_rng(seed).standard_normal((n, m))
+    Zc = Z @ L.T
 
-    # 2. rebuild the h_l column as a blend of its partner and itself.
-    i_hu = NAMES.index('h_u')
-    i_hl = NAMES.index('h_l')
-    z[:, i_hl] = rho * z[:, i_hu] + np.sqrt(1 - rho**2) * z[:, i_hl]
+    # 2. the template's rank pattern.
+    ranks = np.argsort(np.argsort(Zc, axis=0), axis=0)
 
-    # 3. back to numbers between 0 and 1. norm.cdf preserves order, so the
-    u = norm.cdf(z)
-
-    # 4. same final step as sample_X
-    return np.stack([d.ppf(u[:, j]) for j, d in enumerate(DISTS)], axis=1)
+    # 3. deal our real values out following that pattern
+    X_sorted = np.sort(X, axis=0)
+    out = np.zeros_like(X)
+    for j in range(m):
+        out[:, j] = X_sorted[ranks[:, j], j]
+    return out
