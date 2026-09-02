@@ -71,3 +71,65 @@ fig.tight_layout()
 fig.savefig(FIGDIR / 'correlated_uncertainty.png', dpi=150)
 
 print(f"\nFigure written to {FIGDIR / 'correlated_uncertainty.png'}")
+
+
+# Sensitivity analysis: random sampling + binning (scatter plots)
+N_SA = 10**5
+NBINS = 25
+
+Xr = sample_X(N_SA, SEED, method='mc')                      # random sampling
+Xr7 = iman_conover(Xr, correlation_matrix(RHO), seed=42)    # same values, repaired
+Yr, Yr7 = func(Xr), func(Xr7)
+
+def binned_index(x, y, nbins):
+    """Sort by x, average y inside each of nbins equal-count slices.
+
+    Returns the slice centres, the slice averages, and
+    var(slice averages) / var(all y)  --  the first-order sensitivity index.
+    """
+    order = np.argsort(x)
+    groups = np.array_split(order, nbins)
+    centres = np.array([x[g].mean() for g in groups])
+    means = np.array([y[g].mean() for g in groups])
+    return centres, means, means.var() / y.var()
+
+
+print(f"\nBinning sensitivity analysis   N = {N_SA}, {NBINS} bins "
+      f"({N_SA // NBINS} samples per bin)")
+print(f"  {'param':6} {'S_i indep':>10} {'S_i rho=0.7':>12} "
+      f"{'change':>9}")
+
+res = {}
+for j, nm in enumerate(NAMES):
+    c0, m0, s0i = binned_index(Xr[:, j], Yr, NBINS)
+    c7, m7, s7i = binned_index(Xr7[:, j], Yr7, NBINS)
+    res[nm] = (c0, m0, s0i, c7, m7, s7i)
+    print(f"  {nm:6} {s0i:>10.4f}{s7i:>12.4f} "
+          f"{s7i - s0i:>+9.4f}")
+
+print(f"\n  sum of S_i:  independent {sum(res[n][2] for n in NAMES):.4f}   "
+      f"correlated {sum(res[n][5] for n in NAMES):.4f}")
+
+# --- scatter plots with the binned conditional means ------------------------
+fig2, axs2 = plt.subplots(2, 4, figsize=(17, 7.5), sharey=True)
+
+for j, (nm, ax) in enumerate(zip(NAMES, axs2.flat)):
+    c0, m0, s0i, c7, m7, s7i = res[nm]
+    ax.plot(Xr7[:, j], Yr7, '.', ms=1, alpha=0.08, color='#8FA8D0')
+    ax.plot(c0, m0, 'o--', color='#4C72B0', lw=1.6, ms=4,
+            label=f'indep  $S_i$={s0i:.3f}')
+    ax.plot(c7, m7, 'o-', color='#C44E52', lw=2, ms=4,
+            label=rf'$\rho$=0.7  $S_i$={s7i:.3f}')
+    ax.set_xlabel(nm)
+    ax.legend(frameon=False, fontsize=8, loc='upper left')
+    ax.spines[['top', 'right']].set_visible(False)
+
+for ax in axs2[:, 0]:
+    ax.set_ylabel('Flow rate  [m$^3$/yr]')
+
+fig2.suptitle(f'Binning sensitivity analysis: average flow within slices of '
+              f'each input   (random sampling, N = {N_SA}, {NBINS} bins)')
+fig2.tight_layout()
+fig2.savefig(FIGDIR / 'correlated_binning.png', dpi=150)
+
+print(f"Figure written to {FIGDIR / 'correlated_binning.png'}")
