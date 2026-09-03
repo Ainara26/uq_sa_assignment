@@ -10,11 +10,9 @@ def _uniform(lower, upper):
     return uniform(loc=lower, scale=upper - lower)
 
 
-def _lognormal(mean, sd):
-    """Lognormal from the MEAN and SD of the variable itself, not of its log."""
-    cv2 = (sd / mean) ** 2
-    return lognorm(s=np.sqrt(np.log(1 + cv2)), scale=mean / np.sqrt(1 + cv2))
-
+def _lognormal(mu_log, sigma_log):
+    """Lognormal from the mean and sd of ln(X)."""
+    return lognorm(s=sigma_log, scale=np.exp(mu_log))
 
 # Table 1 marginals
 r_w = _lognormal(0.1, 0.02)              # radius of the borehole [m]
