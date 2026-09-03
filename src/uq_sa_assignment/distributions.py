@@ -43,6 +43,9 @@ def sample_X(n, seed, method='lhs'):
 
     return np.stack([d.ppf(u[:, j]) for j, d in enumerate(DISTS)], axis=1)
 
+def sample_from(dists, n, seed):
+    u = qmc.LatinHypercube(d=len(dists), seed=seed).random(n=n)
+    return np.stack([d.ppf(u[:, j]) for j, d in enumerate(dists)], axis=1)
 
 def correlation_matrix(rho, pair=('h_u', 'h_l')):
     """M x M target correlation matrix: identity, plus rho between `pair`."""
