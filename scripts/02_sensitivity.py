@@ -82,11 +82,18 @@ print(f"  {'param':6} {'S_i':>8} {'S_Ti':>8} {'S_Ti-S_i':>9} "
 for j in np.argsort(-STi):
     print(f"  {NAMES[j]:6} {Si[j]:>8.4f} {STi[j]:>8.4f} {STi[j]-Si[j]:>9.4f} "
           f"{SRC[j]**2:>8.4f} {Si[j]-SRC[j]**2:>10.4f}")
+print(f"  {'SUM':6} {Si.sum():>8.4f} {STi.sum():>8.4f} {'--':>9} "
+      f"{(SRC**2).sum():>8.4f} {'--':>10}")
 
-print(f"\n  sum S_i  = {Si.sum():.4f}   <- additive share of the variance")
-print(f"  sum S_Ti = {STi.sum():.4f}   <- must be >= 1")
-print(f"  R2 (linear main effects, from SRC)    = {R2:.4f}")
-print(f"  nonlinear main effects  sum S_i - R2  = {Si.sum() - R2:.4f}")
+# --- variance decomposition -------------------------------------------------
+lin = R2                        # linear main effects
+nonlin = Si.sum() - R2          # main effects beyond the linear approximation
+inter = 1 - Si.sum()            # interactions
+print(f"\n  variance decomposition:")
+print(f"    linear main effects      R2            = {100*lin:7.2f} %")
+print(f"    non-linear main effects  sum S_i - R2  = {100*nonlin:7.2f} %")
+print(f"    interactions             1 - sum S_i   = {100*inter:7.2f} %")
+print(f"    sum SRC^2 = {(SRC**2).sum():.4f}")
 
 # --- comparison of the two methods ------------------------------------------
 order = np.argsort(-STi)
